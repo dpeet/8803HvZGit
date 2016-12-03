@@ -10,7 +10,6 @@ import serial
 import time
 import MySQLdb
 import RPi.GPIO as GPIO
-import time
 import tkFont
 
 root = Tk()
@@ -24,7 +23,7 @@ Zombie1 = ImageTk.PhotoImage(file = "Pictures/Zombie_Stat_Screen.png")
 Zombie2 = ImageTk.PhotoImage(file = "Pictures/Update_Zombie_Screen.png")
 runCoin = 1
 def readPlayerID():
-	port = serial.Serial('/dev/ttyUSB0', 2400, timeout=1)
+	port = serial.Serial('/dev/ttyUSB1', 2400, timeout=1)
 	try:		
 		tagid = port.read(12)
 		if(len(tagid) != 0):
@@ -39,14 +38,17 @@ def readPlayerID():
 
 	except KeyboardInterrupt:
 		port.close()
+		##  db.commit()
+		##  db.close()
 		print ("Program interrupted")
 	return;
 
 def readRFID():
-	port = serial.Serial('/dev/ttyUSB0', 2400, timeout=1)
+	port = serial.Serial('/dev/ttyUSB1', 2400, timeout=1)
 	try:		
 		tagid = port.read(12)
 		if(len(tagid) != 0):
+                        blinkRed(1)
 			# close and open the port to blink the light and give visual feedback
 			port.close()
 			tagid = tagid.strip()
@@ -58,15 +60,43 @@ def readRFID():
 
 	except KeyboardInterrupt:
 		port.close()
+		##  db.commit()
+		##  db.close()
 		print ("Program interrupted")
 	return;
 def createDisplay():
 	w, h = root.winfo_screenwidth(), root.winfo_screenheight()
 	w, h = root.winfo_screenwidth(), root.winfo_screenheight()
 	root.geometry("%dx%d+0+0" % (w, h-10))
+	#root.overrideredirect(1)
+	#root.geometry("%dx%d+0+0" % (w, h))
+	#root.focus_set() # <-- move focus to this widget
+	#root.bind("<Escape>", lambda e: e.widget.quit())
+	#root.geometry("250x150+0+0")
 	canvas.pack(expand = YES, fill = BOTH)
 	canimage = canvas.create_image(0, 0, image = HomeScreen, anchor = NW)
 	return canimage;
+
+def blinkGreen(n):
+   print ("writing")
+   while(n>0):
+      arduinoSerialData = serial.Serial('/dev/ttyUSB0',9600)
+      arduinoSerialData.write('5')
+      arduinoSerialData.close()
+      time.sleep(.25)
+      n-=1
+
+
+def blinkRed(n):
+   print ("writing")
+   while(n>0):
+      arduinoSerialData = serial.Serial('/dev/ttyUSB0',9600)
+      arduinoSerialData.write('6')
+      arduinoSerialData.close()
+      time.sleep(.25)
+      n-=1
+
+    
 def main():
 	while 1:
 		canimage = createDisplay()
@@ -89,6 +119,7 @@ def main():
 		cursor.close()
 		db.close()
 		if (status == 1):
+                        blinkGreen(3)
 			canvas.itemconfig(canimage, image = Human1)
 			#canvas.create_image(0, 0, image = Human1, anchor = NW)
 			pwmPin = 18 # Broadcom pin 18 (P1 pin 12)
@@ -113,15 +144,17 @@ def main():
 				try:
 					if GPIO.event_detected(butPin): 
 						pwm.ChangeDutyCycle(100-dc)
-						GPIO.output(ledPin, GPIO.HIGH)
-						time.sleep(0.075)
-						GPIO.output(ledPin, GPIO.LOW)
-						time.sleep(0.075)
+						#GPIO.output(ledPin, GPIO.HIGH)
+						#time.sleep(0.075)
+						#GPIO.output(ledPin, GPIO.LOW)
+						#time.sleep(0.075)
 						print("coin detected")
+						blinkGreen(1)
 						return 1;
 					else:           
 						pwm.ChangeDutyCycle(dc)
-						GPIO.output(ledPin, GPIO.LOW)
+						#GPIO.output(ledPin, GPIO.LOW)
+						#blinkRed(1)
 						return 0;
 				except KeyboardInterrupt:
 					print ("Program interrupted")
@@ -136,14 +169,23 @@ def main():
 			global runCoin
 			canvas_id = canvas.create_text(250, 350, anchor=NW)
 			canvas.itemconfig(canvas_id, text="", font = dentonlarge, fill = 'yellow')
+			#canvas.i(canvas_id, 0, " ")
+			#canvas.delete(canvas_id, 0)
+			#text = Text(root, font=dentonlarge)
+			#text.insert('1.0', str(coins))
+			#text_window = canvas.create_window(50, 50, anchor=NW, window=text)
 			while (runCoin == 1):
 				root.update()
 				coins += readCoins()
 				if (coins == 1):
 					canvas.itemconfig(canimage, image = Coin)
 					b.configure(activebackground = "#03122b", text="Done >", background = "#032e72", foreground = "white", activeforeground = "white", relief = FLAT, font = dentonlarge)
+					#canvas.create_image(0, 0, image = Coin, anchor = NW)
+				#canvas.delete(canvas_id, 0)
 				if (coins >0):
 					canvas.itemconfig(canvas_id, text = str(coins))
+				#text.delete('1.0')
+				#text.insert('1.0', str(coins))
 
 			if (coins > 0):
 				db=MySQLdb.connect("localhost","root","password","HvZ")
@@ -156,13 +198,16 @@ def main():
 			pwm.stop() # stop PWM
 			GPIO.cleanup() # cleanup all GPIO
 			canvas.itemconfig(canimage, image = Human2)
+			#canvas.create_image(0, 0, image = Human2, anchor = NW)
 			b.destroy()
 			canvas.delete(canvas_id)
 			runCoin = 1;
 			root.update()
 			time.sleep(4)
 		else:
+                        blinkRed(3)
 			canvas.itemconfig(canimage, image = Zombie1)
+			#canvas.create_image(0, 0, image = Zombie1, anchor = NW)
 			rfid = None
 			while rfid is None:
 				root.update()
@@ -171,7 +216,7 @@ def main():
 			cursor = db.cursor()
 			timestamp = time.strftime('%Y-%m-%d %H:%M:%S')				
 			cursor.execute("""insert into Zombies values (%s, %s, %s)""", (playerID, rfid, timestamp))
-			cursor.execute("""update Players set status = 2 where killID = %s""", (rfid))
+			#cursor.execute("""update Players set status = 2 where killID = %s""", (rfid))
 			time.sleep(.5)
 			db.commit()
 			cursor.close()
