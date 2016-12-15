@@ -10,6 +10,7 @@ import serial
 import time
 import MySQLdb
 import RPi.GPIO as GPIO
+import time
 import tkFont
 
 root = Tk()
@@ -23,7 +24,7 @@ Zombie1 = ImageTk.PhotoImage(file = "Pictures/Zombie_Stat_Screen.png")
 Zombie2 = ImageTk.PhotoImage(file = "Pictures/Update_Zombie_Screen.png")
 runCoin = 1
 def readPlayerID():
-	port = serial.Serial('/dev/ttyUSB1', 2400, timeout=1)
+	port = serial.Serial('/dev/ttyUSB0', 2400, timeout=1)
 	try:		
 		tagid = port.read(12)
 		if(len(tagid) != 0):
@@ -44,11 +45,10 @@ def readPlayerID():
 	return;
 
 def readRFID():
-	port = serial.Serial('/dev/ttyUSB1', 2400, timeout=1)
+	port = serial.Serial('/dev/ttyUSB0', 2400, timeout=1)
 	try:		
 		tagid = port.read(12)
 		if(len(tagid) != 0):
-                        blinkRed(1)
 			# close and open the port to blink the light and give visual feedback
 			port.close()
 			tagid = tagid.strip()
@@ -76,27 +76,6 @@ def createDisplay():
 	canvas.pack(expand = YES, fill = BOTH)
 	canimage = canvas.create_image(0, 0, image = HomeScreen, anchor = NW)
 	return canimage;
-
-def blinkGreen(n):
-   print ("writing")
-   while(n>0):
-      arduinoSerialData = serial.Serial('/dev/ttyUSB0',9600)
-      arduinoSerialData.write('5')
-      arduinoSerialData.close()
-      time.sleep(.25)
-      n-=1
-
-
-def blinkRed(n):
-   print ("writing")
-   while(n>0):
-      arduinoSerialData = serial.Serial('/dev/ttyUSB0',9600)
-      arduinoSerialData.write('6')
-      arduinoSerialData.close()
-      time.sleep(.25)
-      n-=1
-
-    
 def main():
 	while 1:
 		canimage = createDisplay()
@@ -119,7 +98,6 @@ def main():
 		cursor.close()
 		db.close()
 		if (status == 1):
-                        blinkGreen(3)
 			canvas.itemconfig(canimage, image = Human1)
 			#canvas.create_image(0, 0, image = Human1, anchor = NW)
 			pwmPin = 18 # Broadcom pin 18 (P1 pin 12)
@@ -144,17 +122,15 @@ def main():
 				try:
 					if GPIO.event_detected(butPin): 
 						pwm.ChangeDutyCycle(100-dc)
-						#GPIO.output(ledPin, GPIO.HIGH)
-						#time.sleep(0.075)
-						#GPIO.output(ledPin, GPIO.LOW)
-						#time.sleep(0.075)
+						GPIO.output(ledPin, GPIO.HIGH)
+						time.sleep(0.075)
+						GPIO.output(ledPin, GPIO.LOW)
+						time.sleep(0.075)
 						print("coin detected")
-						blinkGreen(1)
 						return 1;
 					else:           
 						pwm.ChangeDutyCycle(dc)
-						#GPIO.output(ledPin, GPIO.LOW)
-						#blinkRed(1)
+						GPIO.output(ledPin, GPIO.LOW)
 						return 0;
 				except KeyboardInterrupt:
 					print ("Program interrupted")
@@ -205,7 +181,6 @@ def main():
 			root.update()
 			time.sleep(4)
 		else:
-                        blinkRed(3)
 			canvas.itemconfig(canimage, image = Zombie1)
 			#canvas.create_image(0, 0, image = Zombie1, anchor = NW)
 			rfid = None
@@ -216,7 +191,7 @@ def main():
 			cursor = db.cursor()
 			timestamp = time.strftime('%Y-%m-%d %H:%M:%S')				
 			cursor.execute("""insert into Zombies values (%s, %s, %s)""", (playerID, rfid, timestamp))
-			#cursor.execute("""update Players set status = 2 where killID = %s""", (rfid))
+			cursor.execute("""update Players set status = 2 where playerID = %s""", (playerID))
 			time.sleep(.5)
 			db.commit()
 			cursor.close()
